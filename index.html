@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102c28">
+  <meta name="description" content="毎日の勉強と提出物を端末内で管理するオフライン対応PWA">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <title>よりみち前の30分</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#today" aria-label="今日へ戻る"><span class="brand-mark">余</span><span><strong>よりみち前の30分</strong><small>study routine</small></span></a>
+      <div class="top-actions"><span id="save-status" class="save-status" aria-live="polite">端末に保存</span><span id="offline-status" class="offline-status" aria-live="polite">オフライン準備中</span><button id="theme-toggle" class="icon-button" type="button" title="表示テーマ">◐</button><button id="app-update" class="icon-button" type="button" title="更新を確認">↻</button></div>
+    </header>
+    <nav class="main-nav" aria-label="メインメニュー">
+      <button class="nav-item active" data-view="today"><span>⌂</span>今日</button>
+      <button class="nav-item" data-view="calendar"><span>▦</span>記録</button>
+      <button class="nav-item" data-view="tasks"><span>✓</span>提出物</button>
+      <button class="nav-item" data-view="settings"><span>⚙</span>設定</button>
+    </nav>
+    <main id="app" tabindex="-1">
+      <section id="view-today" class="view active-view" aria-labelledby="today-heading">
+        <div class="page-heading"><div><p class="kicker" id="today-weekday">TODAY</p><h1 id="today-heading">今日の勉強</h1><p id="today-date" class="muted"></p></div><button id="date-picker-button" class="date-pill" type="button"><span>日付を選ぶ</span><b id="selected-date-label"></b></button></div>
+        <div id="schedule-banner" class="schedule-banner"></div>
+        <div id="active-timer" class="timer-card hidden" aria-live="polite"></div>
+        <div class="dashboard-grid">
+          <article class="panel recommendation-panel"><div class="panel-heading"><div><p class="eyebrow">NEXT STEP</p><h2>まずこれをやろう</h2></div><span id="recommendation-badge" class="soft-badge">選べます</span></div><div id="recommendation-content"></div><div id="candidate-list" class="candidate-list"></div><button id="open-understanding" class="text-button" type="button">授業の理解度を入力する</button></article>
+          <article class="panel progress-panel"><div class="panel-heading"><div><p class="eyebrow">TODAY'S PROGRESS</p><h2>今日の進み具合</h2></div><span id="streak-mini" class="streak">0日連続</span></div><div class="progress-row"><div id="progress-ring" class="progress-ring"><strong id="progress-minutes">0</strong><span>分</span></div><div class="progress-copy"><strong id="progress-goal">まず30分</strong><p id="progress-note">合計30分で今日の印がつきます。予定は目安として扱います。</p></div></div><div class="meter"><span id="progress-meter"></span></div><div class="progress-stats"><span>今週平均 <b id="week-average">0分</b></span><span>今月平均 <b id="month-average">0分</b></span></div></article>
+        </div>
+        <div class="content-grid"><article class="panel"><div class="panel-heading"><h2>今日の予定</h2><button class="small-button" id="edit-today-schedule">日付ごとに変更</button></div><div id="today-schedule" class="schedule-list"></div></article><article class="panel"><div class="panel-heading"><h2>気にかけること</h2></div><div id="attention-list" class="attention-list"></div></article></div>
+      </section>
+      <section id="view-calendar" class="view" aria-labelledby="calendar-heading"><div class="page-heading"><div><p class="kicker">REFLECTION</p><h1 id="calendar-heading">記録を振り返る</h1><p class="muted">30分以上勉強した日に印がつきます。</p></div><div class="month-switcher"><button id="prev-month" class="icon-button" type="button" aria-label="前の月">‹</button><strong id="calendar-month"></strong><button id="next-month" class="icon-button" type="button" aria-label="次の月">›</button></div></div><div class="stats-grid"><div class="stat-card accent"><span>連続勉強日数</span><strong id="streak-total">0日</strong><small>今日まで</small></div><div class="stat-card"><span>総勉強時間</span><strong id="lifetime-total">0分</strong><small>最初の利用日から</small></div><div class="stat-card"><span>1日平均</span><strong id="lifetime-average">0分</strong><small>利用開始日から今日まで</small></div></div><div class="content-grid"><article class="panel calendar-panel"><div id="calendar-grid" class="calendar-grid" role="grid"></div><div class="calendar-legend"><span><i class="dot done"></i>30分以上</span><span><i class="dot partial"></i>勉強した日</span></div></article><article class="panel"><div class="panel-heading"><h2>教科別の時間</h2><div class="chart-periods" role="group" aria-label="教科別グラフの期間"><button type="button" class="chart-period active" data-chart-period="month" aria-pressed="true">月</button><button type="button" class="chart-period" data-chart-period="week" aria-pressed="false">週</button></div></div><p id="subject-chart-period-label" class="muted">今月（1日から今日まで）</p><div id="subject-chart" class="subject-chart"></div><div class="average-bars"><div><span>今週の平均</span><strong id="calendar-week-average">0分 / 日</strong></div><div><span>今月の平均</span><strong id="calendar-month-average">0分 / 日</strong></div></div></article></div></section>
+      <section id="view-tasks" class="view" aria-labelledby="tasks-heading"><div class="page-heading"><div><p class="kicker">KEEP IN VIEW</p><h1 id="tasks-heading">提出物とテスト</h1><p class="muted">締め切りが近いものは、復習より先に候補へ出ます。</p></div><button id="add-assignment" class="primary-button" type="button">＋ 提出物を追加</button></div><div class="task-layout"><div><div class="section-tabs"><button class="section-tab active" data-task-tab="assignments">提出物</button><button class="section-tab" data-task-tab="exams">テスト</button></div><div id="task-list" class="task-list"></div><div id="exam-list" class="task-list hidden"></div></div><aside class="panel task-help"><p class="eyebrow">STATUS</p><h2>状態を分けて記録</h2><p>作業が終わっても、提出するまでは「完成未提出」です。提出後に「提出済み」へ変更します。</p><div class="status-key"><span>未着手</span><span>作業中</span><span>完成未提出</span><span>提出済み</span></div><button id="add-exam" class="outline-button" type="button">＋ テストを登録</button></aside></div></section>
+      <section id="view-settings" class="view" aria-labelledby="settings-heading"><div class="page-heading"><div><p class="kicker">YOUR ROUTINE</p><h1 id="settings-heading">設定</h1><p class="muted">続けやすい形に、あとから整えられます。</p></div></div><div class="settings-sections"><article class="panel settings-card"><div class="panel-heading"><div><p class="eyebrow">SUBJECTS</p><h2>教科・資格</h2></div><button id="add-subject" class="small-button" type="button">＋ 追加</button></div><p class="muted">名前を変更しても、これまでの記録はそのまま残ります。</p><div id="subject-settings" class="settings-list"></div></article><article class="panel settings-card"><div class="panel-heading"><div><p class="eyebrow">TIMETABLE</p><h2>時間割</h2></div><button id="add-date-override" class="small-button" type="button">日付の変更</button></div><p class="muted">曜日の基本枠を保存し、学校行事や休日だけ日付ごとに上書きできます。</p><div id="timetable-settings" class="timetable-settings"></div><div id="override-list" class="override-list"></div></article><article class="panel settings-card"><div class="panel-heading"><div><p class="eyebrow">DEVICE & DATA</p><h2>端末とデータ</h2></div></div><div class="setting-row"><div><strong>表示テーマ</strong><small>端末に合わせる／明るい／暗い</small></div><select id="theme-select"><option value="auto">端末に合わせる</option><option value="light">明るい</option><option value="dark">暗い</option></select></div><div class="setting-row"><div><strong>画面内のお知らせ</strong><small>前面で開いている間に予定時刻を知らせます</small></div><label class="switch"><input id="reminder-toggle" type="checkbox"><span></span></label></div><div class="data-actions"><button id="export-data" class="outline-button" type="button">JSONを書き出す</button><button id="import-data" class="outline-button" type="button">JSONを読み込む</button><input id="import-file" type="file" accept="application/json,.json" hidden></div><p id="export-reminder" class="notice"></p><div id="backup-list" class="backup-list"></div><div class="native-alarm-note"><strong>勉強開始を確実に知らせたいとき</strong><p>アプリを閉じている間のオフライン通知は保証できません。必要な時刻は、端末の時計アプリで標準アラームも設定してください。アプリを前面で開いている間は画面内にお知らせします。</p></div></article></div></section>
+    </main>
+  </div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-card"><div class="modal-head"><h2 id="modal-title"></h2><button id="modal-close" class="icon-button" type="button" aria-label="閉じる">×</button></div><div id="modal-body"></div></div></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
