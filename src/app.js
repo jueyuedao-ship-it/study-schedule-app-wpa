@@ -93,7 +93,7 @@ function expandScheduleRows(slots) {
     for (let i = 1; i <= Number(slot.cycles) && cursor < slotEnd; i += 1) {
       const studyEnd = Math.min(slotEnd, cursor + Number(slot.study || 50));
       if (studyEnd <= cursor) break;
-      rows.push({ start: clockValue(cursor), end: clockValue(studyEnd), label: `${i}回目の勉強`, kind: 'study' });
+      rows.push({ ...slot, start: clockValue(cursor), end: clockValue(studyEnd), label: `${i}回目の勉強`, kind: 'study' });
       cursor = studyEnd;
       if (cursor < slotEnd) {
         const breakEnd = Math.min(slotEnd, cursor + Number(slot.break || 10));
@@ -103,6 +103,23 @@ function expandScheduleRows(slots) {
     }
   });
   return rows;
+}
+
+function scheduleRowHtml(row) {
+  if (row.kind === 'break') {
+    return `<div class="schedule-item"><span class="schedule-time">${row.start}<br><small>${row.end}</small></span><span class="schedule-line"></span><div><strong>休憩の時間</strong><small>画面に休憩を表示しています。再開するときにタイマーを押してください。</small></div></div>`;
+  }
+  const fixedSubject = row.subjectId ? subjectName(state, row.subjectId) : '';
+  const subjectNote = fixedSubject ? `${esc(fixedSubject)}をこの枠に固定しています。` : '教科は始めるときに選べます。';
+  const subjectType = state.subjects.find((subject) => subject.id === row.subjectId)?.kind === 'qualification' ? 'qualification' : 'review';
+  const startButton = row.subjectId ? `<button type="button" class="schedule-start" data-start-scheduled-subject="${esc(row.subjectId)}" data-start-scheduled-type="${subjectType}">この枠で始める</button>` : '';
+  return `<div class="schedule-item"><span class="schedule-time">${row.start}<br><small>${row.end}</small></span><span class="schedule-line"></span><div><strong>${esc(row.label || '勉強枠')}${fixedSubject ? `　${esc(fixedSubject)}` : ''}</strong><small>${subjectNote}</small>${startButton}</div></div>`;
+}
+
+function startScheduledSlot(subjectId, type = 'review') {
+  const subject = state.subjects.find((item) => item.id === subjectId);
+  if (!subject) return toast('固定された教科を確認してください');
+  return startCandidate({ id: `scheduled_${currentDate}_${subjectId}`, subjectId, type, title: `${subject.name}の勉強` });
 }
 
 function renderToday() {
@@ -122,7 +139,8 @@ function renderToday() {
   $('#progress-minutes').textContent = mins; $('#progress-meter').style.width = `${pct}%`; $('#progress-ring').style.setProperty('--progress', `${pct}%`); $('#progress-goal').textContent = mins >= 30 ? '今日の最低ライン達成' : `あと${Math.max(0, 30 - mins)}分で印がつきます`;
   const scheduleRows = expandScheduleRows(schedule.slots); const plannedMinutes = scheduleRows.filter((row) => row.kind === 'study').reduce((sum, row) => sum + clockMinutes(row.end) - clockMinutes(row.start), 0); $('#progress-note').textContent = mins >= 30 ? `よく進みました。予定${plannedMinutes ? ` ${plannedMinutes}分` : ''}の残りは、できる範囲で続けられます。` : `合計30分で今日の印がつきます。${plannedMinutes ? `今日の予定は${plannedMinutes}分です。` : '予定は目安として扱います。'}`;
   $('#week-average').textContent = `${Math.round(averageMinutes(effectiveState(), 'week', date))}分`; $('#month-average').textContent = `${Math.round(averageMinutes(effectiveState(), 'month', date))}分`; $('#streak-mini').textContent = `${streakThrough(effectiveState(), date)}日連続`;
-  $('#today-schedule').innerHTML = scheduleRows.length ? scheduleRows.map((row) => `<div class="schedule-item"><span class="schedule-time">${row.start}<br><small>${row.end}</small></span><span class="schedule-line"></span><div><strong>${row.kind === 'break' ? '休憩の時間' : esc(row.label || '勉強枠')}</strong><small>${row.kind === 'break' ? '画面に休憩を表示しています。再開するときにタイマーを押してください。' : '教科は始めるときに選べます。'}</small></div></div>`).join('') : '<p class="muted">今日は登録された予定枠がありません。</p>';
+  $('#today-schedule').innerHTML = scheduleRows.length ? scheduleRows.map(scheduleRowHtml).join('') : '<p class="muted">今日は登録された予定枠がありません。</p>';
+  $$('[data-start-scheduled-subject]').forEach((button) => button.onclick = () => startScheduledSlot(button.dataset.startScheduledSubject, button.dataset.startScheduledType));
   const now = jpTime(); const breakRow = scheduleRows.find((r) => r.kind === 'break' && now >= r.start && now < r.end); if (breakRow) $('#schedule-banner').innerHTML += `<span class="break-prompt">☕ ${breakRow.start}–${breakRow.end} は休憩です</span>`;
   const attention = [];
   completedUnsubmitted(state).forEach((a) => attention.push(`<div class="attention-item warn"><span class="attention-icon">!</span><div><strong>${esc(a.title)}</strong><span>完成未提出です。提出したら状態を変更しましょう。</span></div></div>`));
@@ -294,6 +312,7 @@ function renderTasks() {
 }
 
 function subjectOptions(selected = '') { return state.subjects.map((s) => `<option value="${esc(s.id)}" ${s.id === selected ? 'selected' : ''}>${esc(s.name)}</option>`).join(''); }
+function timetableSubjectOptions(selected = '') { return `<option value="" ${selected ? '' : 'selected'}>教科を開始時に選ぶ</option>${subjectOptions(selected)}`; }
 function openAssignmentModal() {
   openModal('提出物を追加', `<div class="form-grid"><div class="form-field"><label for="assignment-title">提出物の名前</label><input id="assignment-title" required placeholder="例：問題集の提出"></div><div class="form-grid two"><div class="form-field"><label for="assignment-subject">教科</label><select id="assignment-subject">${subjectOptions()}</select></div><div class="form-field"><label for="assignment-due">提出期限</label><input id="assignment-due" type="date" value="${currentDate}" required></div></div><div class="form-field"><label for="assignment-memo">メモ（任意）</label><textarea id="assignment-memo"></textarea></div></div><p class="modal-error hidden" id="form-error"></p><div class="modal-actions"><button type="button" class="outline-button cancel" data-modal-cancel>キャンセル</button><button type="button" class="primary-button" data-save-assignment>追加する</button></div>`);
   $('#modal [data-modal-cancel]').onclick = closeModal; $('#modal [data-save-assignment]').onclick = async () => { const title = $('#assignment-title').value.trim(); const due = $('#assignment-due').value; if (!title || !due) return toast('名前と期限を入力してください'); state.assignments.push({ id: uidFor('assignment'), title, subjectId: $('#assignment-subject').value, dueDate: due, status: '未着手', memo: $('#assignment-memo').value.trim(), createdAt: isoNow() }); closeModal(); await persist('提出物を追加しました'); renderTasks(); renderToday(); };
@@ -311,7 +330,7 @@ function renderSettings() {
   const fallbackSlot = (day) => ({ start: day === 1 ? '16:00' : day >= 2 && day <= 5 ? '17:00' : '08:00', end: day === 0 || day === 6 ? '11:00' : '18:00', label: day === 0 || day === 6 ? '休日：復習・資格（50分×3）' : '帰宅後の復習', ...(day === 0 || day === 6 ? { cycles: 3, study: 50, break: 10 } : {}) });
   $('#timetable-settings').innerHTML = names.map((name, day) => {
     const slots = state.timetable?.[day]?.length ? state.timetable[day] : [fallbackSlot(day)]; const selected = state.classTimetable?.[day] || [];
-    const slotHtml = slots.map((slot, index) => `<div class="slot-row" data-slot-row="${day}-${index}"><div class="slot-inputs"><input type="time" data-slot-start="${day}" data-slot-index="${index}" value="${esc(slot.start)}" aria-label="${name}曜日${index + 1}枠の開始"><span>–</span><input type="time" data-slot-end="${day}" data-slot-index="${index}" value="${esc(slot.end)}" aria-label="${name}曜日${index + 1}枠の終了"><button type="button" class="small-button" data-remove-slot="${day}-${index}" ${slots.length === 1 ? 'disabled' : ''}>削除</button></div></div>`).join('');
+    const slotHtml = slots.map((slot, index) => `<div class="slot-row" data-slot-row="${day}-${index}"><div class="slot-inputs"><input type="time" data-slot-start="${day}" data-slot-index="${index}" value="${esc(slot.start)}" aria-label="${name}曜日${index + 1}枠の開始"><span>–</span><input type="time" data-slot-end="${day}" data-slot-index="${index}" value="${esc(slot.end)}" aria-label="${name}曜日${index + 1}枠の終了"><button type="button" class="small-button" data-remove-slot="${day}-${index}" ${slots.length === 1 ? 'disabled' : ''}>削除</button></div><label class="slot-subject-field"><span>固定する教科</span><select data-slot-subject="${day}" data-slot-index="${index}" aria-label="${name}曜日${index + 1}枠の固定教科">${timetableSubjectOptions(slot.subjectId)}</select></label></div>`).join('');
     return `<div class="weekday-row"><b>${name}曜日</b><div><div class="day-slots" data-day-slots="${day}">${slotHtml}</div><button type="button" class="small-button add-slot" data-add-slot="${day}">＋ 時間枠</button><select multiple data-class-day="${day}" aria-label="${name}曜日の授業科目" style="width:100%;margin-top:6px;border:1px solid var(--line);border-radius:7px;padding:4px;background:var(--bg);color:var(--ink)">${state.subjects.filter((s) => s.kind === 'school').map((s) => `<option value="${esc(s.id)}" ${selected.includes(s.id) ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div></div>`;
   }).join('');
   const overrideDates = Object.keys(state.dateOverrides || {}).sort(); $('#override-list').innerHTML = overrideDates.length ? overrideDates.map((date) => { const x = state.dateOverrides[date]; return `<div class="override-chip"><span>${esc(date)}　${x.holiday ? '休日（午前枠）' : `${(x.subjects || []).map((id) => subjectName(state, id)).join('・') || '日付変更'}`}</span><button type="button" class="small-button" data-remove-override="${date}">解除</button></div>`; }).join('') : '<p class="muted">日付ごとの変更はありません。</p>';
@@ -319,17 +338,18 @@ function renderSettings() {
   $('#backup-list').innerHTML = state.backups?.length ? state.backups.slice().reverse().map((b) => `<button type="button" class="backup-chip" data-restore-backup="${esc(b.id)}">${esc(localDate(b.createdAt))} のバックアップを復元</button>`).join('') : '<span class="muted">自動バックアップはまだありません。</span>';
   $$('#subject-settings [data-subject-name]').forEach((input) => input.onchange = async () => { const s = state.subjects.find((x) => x.id === input.dataset.subjectName); if (s && input.value.trim()) { s.name = input.value.trim(); await persist('教科名を保存しました'); renderAll(); } });
   const saveDaySlots = async (day) => {
-    const rows = $$(`[data-day-slots="${day}"] [data-slot-row]`).map((row) => ({ start: $('[data-slot-start]', row).value, end: $('[data-slot-end]', row).value }));
+    const rows = $$(`[data-day-slots="${day}"] [data-slot-row]`).map((row) => ({ start: $('[data-slot-start]', row).value, end: $('[data-slot-end]', row).value, subjectId: $('[data-slot-subject]', row).value || null }));
     if (!rows.length || rows.some((row) => !row.start || !row.end || row.start >= row.end)) { toast('時間枠の開始・終了を確認してください'); renderSettings(); return; }
     const existingSlots = state.timetable[day] || [];
     state.timetable[day] = rows.map((row, index) => ({ ...(existingSlots[index] || {}), ...row, label: existingSlots[index]?.label || (day === '0' || day === '6' ? '休日：復習・資格（50分×3）' : index ? '夜の勉強枠' : '帰宅後の復習'), ...(day === '0' || day === '6' ? { cycles: existingSlots[index]?.cycles || 3, study: existingSlots[index]?.study || 50, break: existingSlots[index]?.break ?? 10 } : {}) }));
     await persist('時間枠を保存しました'); renderAll();
   };
   $$('[data-slot-start], [data-slot-end]').forEach((input) => input.onchange = () => saveDaySlots(input.dataset.slotStart || input.dataset.slotEnd));
-  $$('[data-add-slot]').forEach((button) => button.onclick = () => { const day = button.dataset.addSlot; const container = $(`[data-day-slots="${day}"]`); const i = $$('[data-slot-row]', container).length; const defaults = i ? { start: '19:30', end: '20:30', label: '夜の勉強枠' } : fallbackSlot(Number(day)); container.insertAdjacentHTML('beforeend', `<div class="slot-row" data-slot-row="${day}-${i}"><div class="slot-inputs"><input type="time" data-slot-start="${day}" data-slot-index="${i}" value="${defaults.start}" aria-label="追加枠の開始"><span>–</span><input type="time" data-slot-end="${day}" data-slot-index="${i}" value="${defaults.end}" aria-label="追加枠の終了"><button type="button" class="small-button" data-remove-slot="${day}-${i}">削除</button></div></div>`); bindSlotButtons(); });
+  $$('[data-slot-subject]').forEach((select) => select.onchange = () => saveDaySlots(select.dataset.slotSubject));
+  $$('[data-add-slot]').forEach((button) => button.onclick = () => { const day = button.dataset.addSlot; const container = $(`[data-day-slots="${day}"]`); const i = $$('[data-slot-row]', container).length; const defaults = i ? { start: '19:30', end: '20:30', label: '夜の勉強枠' } : fallbackSlot(Number(day)); container.insertAdjacentHTML('beforeend', `<div class="slot-row" data-slot-row="${day}-${i}"><div class="slot-inputs"><input type="time" data-slot-start="${day}" data-slot-index="${i}" value="${defaults.start}" aria-label="追加枠の開始"><span>–</span><input type="time" data-slot-end="${day}" data-slot-index="${i}" value="${defaults.end}" aria-label="追加枠の終了"><button type="button" class="small-button" data-remove-slot="${day}-${i}">削除</button></div><label class="slot-subject-field"><span>固定する教科</span><select data-slot-subject="${day}" data-slot-index="${i}" aria-label="追加枠の固定教科">${timetableSubjectOptions()}</select></label></div>`); bindSlotButtons(); });
   const bindSlotButtons = () => $$('[data-remove-slot]').forEach((button) => button.onclick = async () => { const day = button.dataset.removeSlot.split('-')[0]; const rows = $$(`[data-day-slots="${day}"] [data-slot-row]`); if (rows.length <= 1) return; button.closest('[data-slot-row]').remove(); await saveDaySlots(day); });
   bindSlotButtons();
-  $$('[data-class-day]').forEach((select) => select.onchange = async () => { state.classTimetable[select.dataset.classDay] = [...select.selectedOptions].map((x) => x.value); await persist('時間割の教科を保存しました'); renderToday(); });
+  $$('[data-class-day]').forEach((select) => select.onchange = async () => { state.classTimetable[select.dataset.classDay] = [...select.selectedOptions].map((x) => x.value); await persist('時間割の授業教科を保存しました'); renderToday(); });
   $$('[data-remove-override]').forEach((button) => button.onclick = async () => { delete state.dateOverrides[button.dataset.removeOverride]; await persist('日付の変更を解除しました'); renderSettings(); renderToday(); }); $$('[data-restore-backup]').forEach((button) => button.onclick = () => restoreBackup(button.dataset.restoreBackup));
 }
 function openSubjectModal() {
@@ -341,11 +361,11 @@ function openDateOverrideModal() {
   const initialHoliday = Boolean(existing.holiday); const holidayDefault = { start: '08:00', end: '11:00', label: '休日：復習・資格（50分×3）', cycles: 3, study: 50, break: 10 };
   const baseSlots = existing.slots?.length ? existing.slots : (initialHoliday ? [holidayDefault] : (state.timetable[dayIndex(currentDate)] || [{ start: '17:00', end: '18:00', label: '日付ごとの勉強枠' }]));
   const selectedSubjects = Array.isArray(existing.subjects) ? existing.subjects : (state.classTimetable?.[dayIndex(currentDate)] || []);
-  const slotHtml = (slot, index) => `<div class="slot-row" data-override-slot-row="${index}"><div class="slot-inputs"><input type="time" data-override-start data-slot-index="${index}" value="${esc(slot.start)}" aria-label="この日の${index + 1}枠の開始"><span>–</span><input type="time" data-override-end data-slot-index="${index}" value="${esc(slot.end)}" aria-label="この日の${index + 1}枠の終了"><button type="button" class="small-button" data-remove-override-slot="${index}" ${baseSlots.length === 1 ? 'disabled' : ''}>削除</button></div></div>`;
+  const slotHtml = (slot, index) => `<div class="slot-row" data-override-slot-row="${index}"><div class="slot-inputs"><input type="time" data-override-start data-slot-index="${index}" value="${esc(slot.start)}" aria-label="この日の${index + 1}枠の開始"><span>–</span><input type="time" data-override-end data-slot-index="${index}" value="${esc(slot.end)}" aria-label="この日の${index + 1}枠の終了"><button type="button" class="small-button" data-remove-override-slot="${index}" ${baseSlots.length === 1 ? 'disabled' : ''}>削除</button></div><label class="slot-subject-field"><span>固定する教科</span><select data-override-subject-slot data-slot-index="${index}" aria-label="この日の${index + 1}枠の固定教科">${timetableSubjectOptions(slot.subjectId)}</select></label></div>`;
   openModal('日付ごとの時間割変更', `<div class="form-grid"><div class="form-field"><label for="override-date">日付</label><input id="override-date" type="date" value="${currentDate}"></div><label class="setting-row"><span><strong>休日として扱う</strong><small>午前8–11時の50分＋10分休憩×3（実勉強150分）</small></span><input id="override-holiday" type="checkbox" ${initialHoliday ? 'checked' : ''}></label><div class="form-field"><label>この日の時間枠</label><div id="override-slot-rows">${baseSlots.map(slotHtml).join('')}</div><button type="button" class="small-button add-slot" data-add-override-slot>＋ 時間枠</button></div><div class="form-field"><label>その日の授業教科</label><div class="check-list">${school.map((s) => `<label><input type="checkbox" data-override-subject="${esc(s.id)}" ${selectedSubjects.includes(s.id) ? 'checked' : ''}>${esc(s.name)}</label>`).join('')}</div></div></div><div class="modal-actions"><button type="button" class="outline-button cancel" data-modal-cancel>キャンセル</button><button type="button" class="primary-button" data-save-override>保存</button></div>`);
   let holidayTouched = false;
   const renderOverrideSlots = (slots) => { $('#override-slot-rows').innerHTML = slots.map(slotHtml).join(''); bindOverrideSlotButtons(); };
-  const readOverrideSlots = () => $$('[data-override-slot-row]', $('#modal')).map((row) => ({ start: $('[data-override-start]', row).value, end: $('[data-override-end]', row).value }));
+  const readOverrideSlots = () => $$('[data-override-slot-row]', $('#modal')).map((row) => ({ start: $('[data-override-start]', row).value, end: $('[data-override-end]', row).value, subjectId: $('[data-override-subject-slot]', row).value || null }));
   const bindOverrideSlotButtons = () => $$('[data-remove-override-slot]', $('#modal')).forEach((button) => button.onclick = () => { const rows = $$('[data-override-slot-row]', $('#modal')); if (rows.length <= 1) return; button.closest('[data-override-slot-row]').remove(); bindOverrideSlotButtons(); });
   bindOverrideSlotButtons();
   $('#modal [data-add-override-slot]').onclick = () => { const i = $$('[data-override-slot-row]', $('#modal')).length; const start = i ? '19:30' : '17:00'; const end = i ? '20:30' : '18:00'; $('#override-slot-rows').insertAdjacentHTML('beforeend', slotHtml({ start, end }, i)); bindOverrideSlotButtons(); };
