@@ -341,7 +341,16 @@ function renderSettings() {
     const rows = $$(`[data-day-slots="${day}"] [data-slot-row]`).map((row) => ({ start: $('[data-slot-start]', row).value, end: $('[data-slot-end]', row).value, subjectId: $('[data-slot-subject]', row).value || null }));
     if (!rows.length || rows.some((row) => !row.start || !row.end || row.start >= row.end)) { toast('時間枠の開始・終了を確認してください'); renderSettings(); return; }
     const existingSlots = state.timetable[day] || [];
-    state.timetable[day] = rows.map((row, index) => ({ ...(existingSlots[index] || {}), ...row, label: existingSlots[index]?.label || (day === '0' || day === '6' ? '休日：復習・資格（50分×3）' : index ? '夜の勉強枠' : '帰宅後の復習'), ...(day === '0' || day === '6' ? { cycles: existingSlots[index]?.cycles || 3, study: existingSlots[index]?.study || 50, break: existingSlots[index]?.break ?? 10 } : {}) }));
+    state.timetable[day] = rows.map((row, index) => {
+      const previous = existingSlots[index] || {};
+      const slot = { ...previous, ...row, label: previous.label || '学習予定' };
+      // 50+10 cycles belong only to the old three-hour block. A new 30-minute
+      // weekend slot must remain a single study period after later UI edits.
+      if (previous.start !== row.start || previous.end !== row.end) {
+        delete slot.cycles; delete slot.study; delete slot.break;
+      }
+      return slot;
+    });
     await persist('時間枠を保存しました'); renderAll();
   };
   $$('[data-slot-start], [data-slot-end]').forEach((input) => input.onchange = () => saveDaySlots(input.dataset.slotStart || input.dataset.slotEnd));

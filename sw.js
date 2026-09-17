@@ -5,7 +5,7 @@
  * { type: 'SKIP_WAITING' }.
  */
 const CACHE_PREFIX = 'study-routine-shell';
-const CACHE_VERSION = '2026-09-17-4';
+const CACHE_VERSION = '2026-09-17-6';
 const scopePath = new URL(self.registration.scope).pathname;
 const scopeKey = encodeURIComponent(scopePath).replace(/%/g, '_');
 const CACHE_NAME = `${CACHE_PREFIX}-${scopeKey}-${CACHE_VERSION}`;
@@ -67,9 +67,13 @@ self.addEventListener('fetch', (event) => {
     const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
 
-    // Navigation fallback is the cached entry point.  It also covers a
-    // direct-open URL and GitHub Pages' project subpath when offline.
+    // An uncached local page may be a real route. Try it online before the
+    // offline entry-point fallback.
     if (request.mode === 'navigate') {
+      try {
+        const response = await fetch(request);
+        if (response.ok) return response;
+      } catch (_) { /* Use the offline entry point below. */ }
       const fallback = await cache.match(new URL('./index.html', self.registration.scope).toString());
       if (fallback) return fallback;
     }

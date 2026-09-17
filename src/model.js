@@ -6,12 +6,18 @@ export const UNDERSTANDING = [
   { value: 'understood', label: '分かった', score: 2 },
 ];
 export const SUBJECT_PRESETS = [
-  { id: 'math', name: '数学', kind: 'school', color: '#ef8354' },
-  { id: 'english', name: '英語', kind: 'school', color: '#4f86c6' },
-  { id: 'japanese', name: '国語', kind: 'school', color: '#a569bd' },
-  { id: 'science', name: '理科', kind: 'school', color: '#2a9d8f' },
-  { id: 'social', name: '社会', kind: 'school', color: '#e9c46a' },
+  { id: 'geography', name: '地理', kind: 'school', color: '#e9c46a' },
+  { id: 'basic-physics', name: '物理基礎', kind: 'school', color: '#2a9d8f' },
+  { id: 'basic-analysis-b', name: '基礎解析B', kind: 'school', color: '#ef8354' },
   { id: 'it-passport', name: 'ITパスポート', kind: 'qualification', color: '#457b9d' },
+  { id: 'english-1', name: '英語Ⅰ', kind: 'school', color: '#4f86c6' },
+  { id: 'history-1', name: '歴史Ⅰ', kind: 'school', color: '#b98551' },
+  { id: 'communication', name: 'コミュニケーション', kind: 'school', color: '#8e78b0' },
+  { id: 'basic-analysis-a', name: '基礎解析A', kind: 'school', color: '#d37857' },
+  { id: 'professional-basics', name: '専門基礎', kind: 'school', color: '#607d72' },
+  { id: 'chemistry-1', name: '化学Ⅰ', kind: 'school', color: '#5e9caa' },
+  { id: 'biology', name: '生物', kind: 'school', color: '#7d9b59' },
+  { id: 'japanese-1', name: '国語Ⅰ', kind: 'school', color: '#a569bd' },
   { id: 'surveying', name: '測量士補', kind: 'qualification', color: '#7b8f5f' },
 ];
 export const JST = 'Asia/Tokyo';
@@ -44,20 +50,20 @@ export const formatClock = (ms) => {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 export const defaultTimetable = () => ({
-  0: [{ start: '08:00', end: '11:00', label: '休日：復習・資格（50分×3）', cycles: 3, study: 50, break: 10 }],
-  1: [{ start: '16:00', end: '18:00', label: '帰宅後の復習' }],
-  2: [{ start: '17:00', end: '18:00', label: '帰宅後の復習' }],
-  3: [{ start: '17:00', end: '18:00', label: '帰宅後の復習' }, { start: '19:30', end: '20:30', label: '夜の勉強枠' }],
-  4: [{ start: '17:00', end: '18:00', label: '帰宅後の復習' }, { start: '19:30', end: '20:30', label: '夜の勉強枠' }],
-  5: [{ start: '17:00', end: '18:00', label: '帰宅後の復習' }],
-  6: [{ start: '08:00', end: '11:00', label: '休日：復習・資格（50分×3）', cycles: 3, study: 50, break: 10 }],
+  0: [['08:00', '08:30', 'basic-physics'], ['08:30', '09:00', 'chemistry-1'], ['09:00', '09:30', 'biology'], ['09:30', '10:00', 'professional-basics'], ['10:00', '10:30', 'it-passport'], ['10:30', '11:00', 'it-passport']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
+  1: [['17:00', '17:30', 'geography'], ['17:30', '18:00', 'basic-physics'], ['19:30', '20:00', 'basic-analysis-b'], ['20:00', '20:30', 'it-passport']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
+  2: [['17:00', '17:30', 'english-1'], ['17:30', '18:00', 'history-1']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
+  3: [['16:00', '16:30', 'communication'], ['16:30', '17:00', 'basic-analysis-a'], ['17:00', '17:30', 'professional-basics'], ['17:30', '18:00', 'chemistry-1']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
+  4: [['17:00', '17:30', 'basic-analysis-b'], ['17:30', '18:00', 'biology'], ['19:30', '20:00', 'professional-basics'], ['20:00', '20:30', 'english-1']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
+  5: [['17:00', '17:30', 'basic-analysis-a'], ['17:30', '18:00', 'professional-basics']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
+  6: [['08:00', '08:30', 'basic-analysis-b'], ['08:30', '09:00', 'basic-analysis-a'], ['09:00', '09:30', 'english-1'], ['09:30', '10:00', 'it-passport'], ['10:00', '10:30', 'it-passport'], ['10:30', '11:00', 'it-passport']].map(([start, end, subjectId]) => ({ start, end, subjectId, label: '学習予定' })),
 });
 export const defaultState = (now = new Date()) => ({
   schemaVersion: VERSION,
   settings: { theme: 'auto', reminderEnabled: true, firstUseDate: localDate(now), lastExportAt: null },
   subjects: SUBJECT_PRESETS.map((x) => ({ ...x })),
   timetable: defaultTimetable(),
-  classTimetable: { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] },
+  classTimetable: { 0: ['basic-physics', 'chemistry-1', 'biology', 'professional-basics'], 1: ['geography', 'basic-physics', 'basic-analysis-b'], 2: ['english-1', 'history-1'], 3: ['communication', 'basic-analysis-a', 'professional-basics', 'chemistry-1'], 4: ['basic-analysis-b', 'biology', 'professional-basics', 'english-1'], 5: ['basic-analysis-a', 'professional-basics', 'japanese-1'], 6: ['basic-analysis-b', 'basic-analysis-a', 'english-1'] },
   dateOverrides: {},
   exams: [],
   assignments: [],
@@ -120,7 +126,8 @@ export const recommendationsForDate = (state, date) => {
   const beforeRows = reviewSubjects.map((s) => Object.values(state.understanding).filter((x) => x.date === date && x.subjectId === s.id && !x.after).sort((a, b) => (b.at || '').localeCompare(a.at || ''))[0]).filter(Boolean);
   const anxiousIds = new Set(beforeRows.filter((x) => x.level === 'unknown' || x.level === 'unsure').map((x) => x.subjectId));
   if (anxiousIds.size) reviewSubjects = reviewSubjects.filter((s) => anxiousIds.has(s.id));
-  const isWeekendSlot = scheduleForDate(state, date).slots.some((s) => s.cycles);
+  const slots = scheduleForDate(state, date).slots;
+  const isWeekendSlot = (dayIndex(date) === 0 || dayIndex(date) === 6 || slots.some((s) => s.cycles)) && slots.length > 0;
   if (isWeekendSlot) {
     // A holiday morning is a planned school-review block even when no class
     // subjects are configured for that date. Unresolved subjects remain first
@@ -134,8 +141,10 @@ export const recommendationsForDate = (state, date) => {
     const latest = before || latestUnderstanding(state, s.id); const label = UNDERSTANDING.find((u) => u.value === latest?.level)?.label || '理解度未入力';
     return candidate('review', s.id, `${s.name}の復習`, `${before ? '授業後' : '前回の復習後'}の理解度：${label}`, null, { anxiety: latest?.level === 'unknown' ? 2 : latest?.level === 'unsure' ? 1 : 0 });
   });
-  const qualification = scheduleForDate(state, date).slots.some((s) => s.cycles) && !examRows.length
-    ? state.subjects.filter((s) => s.kind === 'qualification').map((s) => candidate('qualification', s.id, `${s.name}を進める`, '休日の資格枠', null)) : [];
+  const qualificationIds = new Set(slots.filter((slot) => slot.subjectId && state.subjects.some((s) => s.id === slot.subjectId && s.kind === 'qualification')).map((slot) => slot.subjectId));
+  if (slots.some((slot) => slot.cycles)) state.subjects.filter((s) => s.kind === 'qualification').forEach((s) => qualificationIds.add(s.id));
+  const qualification = !examRows.length
+    ? state.subjects.filter((s) => qualificationIds.has(s.id)).map((s) => candidate('qualification', s.id, `${s.name}を進める`, '時間割の資格枠', null)) : [];
   const all = [...assignmentCandidates, ...examCandidates, ...reviewCandidates, ...qualification];
   all.sort((a, b) => {
     const ad = a.dueDate || '9999-99-99'; const bd = b.dueDate || '9999-99-99';
