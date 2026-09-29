@@ -3,7 +3,7 @@ import {
   createSession, dayIndex, defaultState, diffDays, finishTimer, formatClock, formatMinutes,
   localDate, normalizeState, pauseTimer, recommendationsForDate, resumeTimer, scheduleForDate,
   sessionDurationsByDate, streakThrough, subjectDurations, subjectName, switchTimerSubject,
-  timerBySubject, timerElapsed, timerRemaining, todaySubjects, beginTimer, uidFor, isoNow, periodBounds,
+  timerBySubject, timerElapsed, timerRemaining, todaySubjects, beginTimer, beginStopwatch, uidFor, isoNow, periodBounds,
 } from './model.js';
 import { clearAll, loadState, parseImport, replaceStateWithBackup, saveState, serializeState } from './db.js';
 
@@ -15,7 +15,11 @@ const jpDate = (date) => new Intl.DateTimeFormat('ja-JP', { timeZone: JST, year:
 const jpTime = (date = new Date()) => new Intl.DateTimeFormat('ja-JP', { timeZone: JST, hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
 const currentJst = () => localDate(new Date());
 const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-const typeLabel = { review: '復習', assignment: '提出物', exam: 'テスト', qualification: '資格' };
+const typeLabel = { review: '復習', assignment: '提出物', exam: 'テスト', qualification: '資格', stopwatch: '自由計測' };
+const formatStopwatch = (ms) => {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+};
 let state;
 let currentDate = currentJst();
 let chosenCandidate = null;
@@ -134,6 +138,8 @@ function renderToday() {
   $('#candidate-list').innerHTML = recs.length ? `${recs.slice(0, 8).map((c) => `<button type="button" class="candidate ${c.id === chosenCandidate?.id ? 'selected' : ''}" data-candidate="${esc(c.id)}"><span>${esc(c.title)}</span><span class="type">${typeLabel[c.type] || c.type}</span></button>`).join('')}<button class="text-button candidate-manual" id="start-manual" type="button">教科を選んで始める</button>` : '<p class="muted">時間割に授業の教科を登録すると、復習候補が表示されます。</p>';
   $('#start-recommendation')?.addEventListener('click', () => startCandidate(chosenCandidate));
   $('#start-manual')?.addEventListener('click', openStartSubjectModal);
+  $('#start-stopwatch').disabled = Boolean(state.timer);
+  $('#start-stopwatch').onclick = openStopwatchSubjectModal;
   $$('#candidate-list [data-candidate]').forEach((button) => button.addEventListener('click', () => { chosenCandidate = recs.find((x) => x.id === button.dataset.candidate) || null; renderToday(); }));
   const durations = dailyDurations(); const rawMs = durations[date] || 0; const mins = Math.floor(rawMs / 60000); const pct = Math.min(100, Math.round(rawMs / 1800000 * 100));
   $('#progress-minutes').textContent = mins; $('#progress-meter').style.width = `${pct}%`; $('#progress-ring').style.setProperty('--progress', `${pct}%`); $('#progress-goal').textContent = mins >= 30 ? '今日の最低ライン達成' : `あと${Math.max(0, 30 - mins)}分で印がつきます`;
@@ -151,10 +157,13 @@ function renderToday() {
 }
 function renderTimerCard() {
   const node = $('#active-timer'); if (!state?.timer || !['running', 'paused'].includes(state.timer.status)) { node.classList.add('hidden'); timerWasUnderMinimum = null; return; }
-  node.classList.remove('hidden'); const elapsed = timerElapsed(state.timer); const under = elapsed < 1800000; const current = state.timer.currentSubjectId || state.timer.segments.at(-1)?.subjectId; const options = state.subjects.map((s) => `<option value="${esc(s.id)}" ${s.id === current ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  node.classList.remove('hidden'); const stopwatch = state.timer.mode === 'stopwatch'; const elapsed = timerElapsed(state.timer); const under = elapsed < (stopwatch ? 60000 : 1800000); const current = state.timer.currentSubjectId || state.timer.segments.at(-1)?.subjectId; const options = state.subjects.map((s) => `<option value="${esc(s.id)}" ${s.id === current ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   timerWasUnderMinimum = under;
-  node.innerHTML = `<div><p class="eyebrow">${state.timer.status === 'paused' ? 'PAUSED' : 'FOCUS NOW'}</p><h2>${esc(subjectName(state, current))}</h2><span class="timer-mode">${under ? '最低30分までの残り' : '30分を超えて計測中（音なし）'}</span></div><strong class="timer-number">${under ? formatClock(timerRemaining(state.timer)) : `＋${formatClock(Math.max(0, elapsed - 1800000))}`}</strong><div class="timer-buttons"><select id="timer-subject" aria-label="教科を切り替える">${options}</select>${state.timer.status === 'paused' ? '<button id="timer-resume" type="button">再開</button>' : '<button id="timer-pause" type="button">一時停止</button>'}<button id="timer-finish" class="finish" type="button">終了</button><button id="timer-cancel" type="button">中止</button></div>`;
-  $('#timer-subject').onchange = () => switchSubject($('#timer-subject').value); $('#timer-pause')?.addEventListener('click', () => changeTimer(pauseTimer(state.timer), '一時停止しました')); $('#timer-resume')?.addEventListener('click', () => changeTimer(resumeTimer(state.timer), '再開しました')); $('#timer-finish').onclick = finishCurrentTimer; $('#timer-cancel').onclick = () => confirmModal('タイマーを中止しますか？', 'このタイマーの記録を破棄します。', '破棄する', async () => { state.timer = null; await persist('タイマーを破棄しました'); renderAll(); });
+  const timerReadout = stopwatch ? formatStopwatch(elapsed) : under ? formatClock(timerRemaining(state.timer)) : `＋${formatClock(Math.max(0, elapsed - 1800000))}`;
+  const timerDescription = stopwatch ? '経過時間' : under ? '最低30分までの残り' : '30分を超えて計測中（音なし）';
+  const subjectControl = stopwatch ? '' : `<select id="timer-subject" aria-label="教科を切り替える">${options}</select>`;
+  node.innerHTML = `<div><p class="eyebrow">${state.timer.status === 'paused' ? 'PAUSED' : 'FOCUS NOW'}</p><h2>${esc(subjectName(state, current))}</h2><span class="timer-mode">${timerDescription}</span></div><strong class="timer-number">${timerReadout}</strong><div class="timer-buttons">${subjectControl}${state.timer.status === 'paused' ? '<button id="timer-resume" type="button">再開</button>' : '<button id="timer-pause" type="button">一時停止</button>'}<button id="timer-finish" class="finish" type="button">${stopwatch ? '終了・記録' : '終了'}</button><button id="timer-cancel" type="button">中止</button></div>`;
+  if (!stopwatch) $('#timer-subject').onchange = () => switchSubject($('#timer-subject').value); $('#timer-pause')?.addEventListener('click', () => changeTimer(pauseTimer(state.timer), '一時停止しました')); $('#timer-resume')?.addEventListener('click', () => changeTimer(resumeTimer(state.timer), '再開しました')); $('#timer-finish').onclick = finishCurrentTimer; $('#timer-cancel').onclick = () => confirmModal('タイマーを中止しますか？', 'このタイマーの記録を破棄します。', '破棄する', async () => { state.timer = null; await persist('タイマーを破棄しました'); renderAll(); });
 }
 async function changeTimer(next, message) { state.timer = next; await persist(message); renderAll(); }
 async function startCandidate(candidate) {
@@ -176,15 +185,29 @@ function openStartSubjectModal() {
     renderAll();
   };
 }
+function openStopwatchSubjectModal() {
+  if (state.timer) return toast('すでにタイマーが動いています');
+  openModal('教科を選んで自由に計測', `<div class="form-grid"><div class="form-field"><label for="start-stopwatch-subject">教科・資格</label><select id="start-stopwatch-subject">${subjectOptions()}</select></div></div><div class="modal-actions"><button type="button" class="outline-button cancel" data-modal-cancel>キャンセル</button><button type="button" class="primary-button" data-begin-stopwatch>計測を始める</button></div>`);
+  $('#modal [data-modal-cancel]').onclick = closeModal;
+  $('#modal [data-begin-stopwatch]').onclick = async () => {
+    const subjectId = $('#start-stopwatch-subject').value;
+    if (!state.subjects.some((subject) => subject.id === subjectId)) return toast('教科を選び直してください');
+    state.timer = beginStopwatch(subjectId);
+    closeModal();
+    const saved = await persist('ストップウォッチを始めました');
+    if (saved) renderAll();
+  };
+}
 function switchSubject(subjectId) {
   if (!state.timer || state.timer.status !== 'running') return;
   const old = state.timer.currentSubjectId || state.timer.segments.at(-1)?.subjectId;
   openAfterUnderstanding(old, () => { state.timer = switchTimerSubject(state.timer, subjectId); if (state.timer?.segments.at(-1)) state.timer.segments.at(-1).type = state.timer.type || 'review'; persist('教科を切り替えました').then(renderAll); });
 }
 async function finishCurrentTimer() {
-  if (!state.timer) return; if (timerElapsed(state.timer) < 1800000) { toast('合計30分になるまで終了できません'); return; }
+  if (!state.timer) return; const stopwatch = state.timer.mode === 'stopwatch'; const minimum = stopwatch ? 60000 : 1800000;
+  if (timerElapsed(state.timer) < minimum) { toast(stopwatch ? '1分以上計測すると記録できます' : '合計30分になるまで終了できません'); return; }
   const finished = finishTimer(state.timer); const memo = '';
-  state.sessions.push(createSession({ ...finished, type: state.timer.type }, memo)); state.timer = null; const saved = await persist('勉強時間を記録しました'); if (saved) { renderAll(); openAfterUnderstanding(finished.currentSubjectId || finished.segments.at(-1)?.subjectId, null, localDate(finished.finishedAt)); }
+  state.sessions.push(createSession({ ...finished, type: state.timer.type || (stopwatch ? 'stopwatch' : undefined) }, memo)); state.timer = null; const saved = await persist('勉強時間を記録しました'); if (saved) { renderAll(); if (!stopwatch) openAfterUnderstanding(finished.currentSubjectId || finished.segments.at(-1)?.subjectId, null, localDate(finished.finishedAt)); }
 }
 function openAfterUnderstanding(subjectId, callback, date = localDate(new Date())) {
   if (!subjectId) { callback?.(); return; }
@@ -259,7 +282,7 @@ function resizeSegmentsBySubject(originalSegments, rows) {
 }
 function openEditSessionModal(session) {
   if (!session) return; const originalSegments = (session.segments || []).map((segment) => ({ ...segment })); const originalBy = {}; originalSegments.forEach((segment) => { originalBy[segment.subjectId] = (originalBy[segment.subjectId] || 0) + Math.max(0, new Date(segment.endedAt).getTime() - new Date(segment.startedAt).getTime()); }); const entries = Object.entries(originalBy); const total = entries.reduce((sum, [, value]) => sum + value, 0); const date = localDate(session.finishedAt || session.startedAt); const rowHtml = ([subjectId, value], i) => `<div class="edit-segment-row form-grid three" data-edit-segment-row><select data-edit-segment-subject="${i}">${subjectOptions(subjectId)}</select><input data-edit-segment-minutes="${i}" type="number" min="1" step="1" value="${Math.max(1, Math.round(value / 60000))}" aria-label="勉強時間（分）"><span class="muted">分</span><button type="button" class="small-button" data-remove-edit-segment>削除</button></div>`;
-  openModal('勉強記録を修正', `<div class="form-grid"><div class="form-grid two"><div class="form-field"><label for="edit-session-date">日付</label><input id="edit-session-date" type="date" value="${date}"></div><div class="form-field"><label>合計</label><strong id="edit-session-total">${Math.round(total / 60000)}分</strong></div></div><div class="form-field"><label>教科別の時間（行を変えると区間を修正）</label><div id="edit-segment-rows">${entries.map(rowHtml).join('')}</div><button type="button" class="small-button" id="add-edit-segment">＋ 教科を追加</button></div><div class="form-field"><label for="edit-session-type">種類</label><select id="edit-session-type"><option value="review" ${session.type === 'review' ? 'selected' : ''}>復習</option><option value="exam" ${session.type === 'exam' ? 'selected' : ''}>テスト対策</option><option value="qualification" ${session.type === 'qualification' ? 'selected' : ''}>資格</option><option value="assignment" ${session.type === 'assignment' ? 'selected' : ''}>提出物</option></select></div><div class="form-field"><label for="edit-session-memo">メモ</label><textarea id="edit-session-memo">${esc(session.memo || '')}</textarea></div><p class="muted">メモや種類だけを変更した場合、元の教科区間と時刻はそのまま保存されます。</p></div><div class="modal-actions"><button type="button" class="outline-button cancel" data-modal-cancel>キャンセル</button><button type="button" class="primary-button" data-save-session>保存</button></div>`);
+  openModal('勉強記録を修正', `<div class="form-grid"><div class="form-grid two"><div class="form-field"><label for="edit-session-date">日付</label><input id="edit-session-date" type="date" value="${date}"></div><div class="form-field"><label>合計</label><strong id="edit-session-total">${Math.round(total / 60000)}分</strong></div></div><div class="form-field"><label>教科別の時間（行を変えると区間を修正）</label><div id="edit-segment-rows">${entries.map(rowHtml).join('')}</div><button type="button" class="small-button" id="add-edit-segment">＋ 教科を追加</button></div><div class="form-field"><label for="edit-session-type">種類</label><select id="edit-session-type"><option value="review" ${session.type === 'review' ? 'selected' : ''}>復習</option><option value="exam" ${session.type === 'exam' ? 'selected' : ''}>テスト対策</option><option value="qualification" ${session.type === 'qualification' ? 'selected' : ''}>資格</option><option value="assignment" ${session.type === 'assignment' ? 'selected' : ''}>提出物</option><option value="stopwatch" ${session.type === 'stopwatch' ? 'selected' : ''}>自由計測</option></select></div><div class="form-field"><label for="edit-session-memo">メモ</label><textarea id="edit-session-memo">${esc(session.memo || '')}</textarea></div><p class="muted">メモや種類だけを変更した場合、元の教科区間と時刻はそのまま保存されます。</p></div><div class="modal-actions"><button type="button" class="outline-button cancel" data-modal-cancel>キャンセル</button><button type="button" class="primary-button" data-save-session>保存</button></div>`);
   const bindEditRows = () => { $$('#edit-segment-rows [data-remove-edit-segment]').forEach((button) => button.onclick = () => { if ($$('#edit-segment-rows [data-edit-segment-row]').length > 1) { button.closest('[data-edit-segment-row]').remove(); updateEditTotal(); } }); $$('#edit-segment-rows [data-edit-segment-minutes]').forEach((input) => input.oninput = updateEditTotal); };
   const updateEditTotal = () => { const totalMinutes = $$('#edit-segment-rows [data-edit-segment-minutes]').reduce((sum, input) => sum + (Number(input.value) || 0), 0); $('#edit-session-total').textContent = `${totalMinutes}分`; }; bindEditRows(); $('#modal #add-edit-segment').onclick = () => { const i = $$('#edit-segment-rows [data-edit-segment-row]').length; $('#edit-segment-rows').insertAdjacentHTML('beforeend', rowHtml([state.subjects[0]?.id || '', 30 * 60000], i)); bindEditRows(); updateEditTotal(); };
   $('#modal [data-modal-cancel]').onclick = closeModal;
@@ -479,7 +502,7 @@ async function init() {
   catch (error) { document.body.innerHTML = `<main style="max-width:640px;margin:20vh auto;padding:24px;font-family:system-ui"><h1>データを読み込めません</h1><p>保存領域の読み込みに失敗しました。ページを閉じず、保存領域を確認してから再読み込みしてください。</p><p style="color:#a44">${esc(error.message)}</p></main>`; return; }
   wireEvents(); document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (!followJstDate()) { refreshBreakPrompt(); refreshLiveStats(); } maybeShowReminder(); }); $('#reminder-toggle').checked = state.settings.reminderEnabled; renderAll(); await registerServiceWorker();
   if (state.timer && ['running', 'paused'].includes(state.timer.status) && timerElapsed(state.timer) > 6 * 3600000) openLongTimerPrompt();
-  clearInterval(timerInterval); timerInterval = setInterval(() => { const followed = followJstDate(); if (!followed) refreshBreakPrompt(); if (state?.timer) { const elapsedNow = timerElapsed(state.timer); const isUnder = elapsedNow < 1800000; const timerNumber = $('.timer-number'); if (timerNumber) timerNumber.textContent = isUnder ? formatClock(timerRemaining(state.timer)) : `＋${formatClock(Math.max(0, elapsedNow - 1800000))}`; if (timerWasUnderMinimum !== null && timerWasUnderMinimum !== isUnder) { renderToday(); renderCalendar(); } const durations = dailyDurations(); const raw = durations[currentDate] || 0; const mins = Math.floor(raw / 60000); $('#progress-minutes').textContent = mins; $('#progress-meter').style.width = `${Math.min(100, Math.round(raw / 1800000 * 100))}%`; $('#progress-ring').style.setProperty('--progress', `${Math.min(100, Math.round(raw / 1800000 * 100))}%`); } maybeShowReminder(); }, 1000);
+  clearInterval(timerInterval); timerInterval = setInterval(() => { const followed = followJstDate(); if (!followed) refreshBreakPrompt(); if (state?.timer) { const elapsedNow = timerElapsed(state.timer); const stopwatch = state.timer.mode === 'stopwatch'; const isUnder = elapsedNow < (stopwatch ? 60000 : 1800000); const timerNumber = $('.timer-number'); if (timerNumber) timerNumber.textContent = stopwatch ? formatStopwatch(elapsedNow) : isUnder ? formatClock(timerRemaining(state.timer)) : `＋${formatClock(Math.max(0, elapsedNow - 1800000))}`; if (timerWasUnderMinimum !== null && timerWasUnderMinimum !== isUnder) { renderToday(); renderCalendar(); } const durations = dailyDurations(); const raw = durations[currentDate] || 0; const mins = Math.floor(raw / 60000); $('#progress-minutes').textContent = mins; $('#progress-meter').style.width = `${Math.min(100, Math.round(raw / 1800000 * 100))}%`; $('#progress-ring').style.setProperty('--progress', `${Math.min(100, Math.round(raw / 1800000 * 100))}%`); } maybeShowReminder(); }, 1000);
 }
 init();
 

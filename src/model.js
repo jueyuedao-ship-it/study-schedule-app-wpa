@@ -170,6 +170,7 @@ export const timerBySubject = (timer, now = Date.now()) => (timer?.segments || [
   map[seg.subjectId] = (map[seg.subjectId] || 0) + durationForSegment(seg, now); return map;
 }, {});
 export const beginTimer = (subjectId, now = new Date()) => ({ id: uid('timer'), status: 'running', currentSubjectId: subjectId, startedAt: now.toISOString(), pausedAt: null, segments: [{ subjectId, startedAt: now.toISOString(), endedAt: null }] });
+export const beginStopwatch = (subjectId, now = new Date()) => ({ ...beginTimer(subjectId, now), mode: 'stopwatch', type: 'stopwatch' });
 export const pauseTimer = (timer, now = new Date()) => {
   if (!timer || timer.status !== 'running') return timer;
   const copy = cloneState(timer); copy.status = 'paused'; copy.pausedAt = now.toISOString();
@@ -256,4 +257,4 @@ export const createSession = (timer, memo = '', now = new Date()) => ({
 export const isoNow = () => new Date().toISOString();
 export const uidFor = uid;
 
-if (typeof globalThis !== 'undefined') globalThis.StudyModel = { VERSION, UNDERSTANDING, SUBJECT_PRESETS, defaultState, normalizeState, scheduleForDate, recommendationsForDate, timerElapsed, timerRemaining, timerBySubject, sessionDurationsByDate, averageMinutes, streakThrough, splitIntervalByDate, beginTimer, pauseTimer, resumeTimer, switchTimerSubject, finishTimer };
+if (typeof globalThis !== 'undefined') globalThis.StudyModel = { VERSION, UNDERSTANDING, SUBJECT_PRESETS, defaultState, normalizeState, scheduleForDate, recommendationsForDate, timerElapsed, timerRemaining, timerBySubject, sessionDurationsByDate, averageMinutes, streakThrough, splitIntervalByDate, beginTimer, beginStopwatch, pauseTimer, resumeTimer, switchTimerSubject, finishTimer };
