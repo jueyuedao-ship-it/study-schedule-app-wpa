@@ -5,7 +5,7 @@
  * { type: 'SKIP_WAITING' }.
  */
 const CACHE_PREFIX = 'study-routine-shell';
-const CACHE_VERSION = '2026-09-17-6';
+const CACHE_VERSION = '2026-09-29-1';
 const scopePath = new URL(self.registration.scope).pathname;
 const scopeKey = encodeURIComponent(scopePath).replace(/%/g, '_');
 const CACHE_NAME = `${CACHE_PREFIX}-${scopeKey}-${CACHE_VERSION}`;
