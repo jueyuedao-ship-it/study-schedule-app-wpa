@@ -5,7 +5,7 @@
  * { type: 'SKIP_WAITING' }.
  */
 const CACHE_PREFIX = 'study-routine-shell';
-const CACHE_VERSION = '2026-09-29-2';
+const CACHE_VERSION = '2026-10-04-1';
 const scopePath = new URL(self.registration.scope).pathname;
 const scopeKey = encodeURIComponent(scopePath).replace(/%/g, '_');
 const CACHE_NAME = `${CACHE_PREFIX}-${scopeKey}-${CACHE_VERSION}`;
@@ -18,7 +18,7 @@ const SHELL_PATHS = [
   './styles.css',
   './src/app.js',
   './src/model.js',
-  './src/db.js',
+  './src/db.js',\n  './src/bridge.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
