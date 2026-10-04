@@ -169,7 +169,7 @@ async function changeTimer(next, message) { state.timer = next; await persist(me
 async function startCandidate(candidate) {
   if (!candidate?.subjectId) { toast('先に教科を選んでください'); return; }
   if (state.timer) { toast('すでにタイマーが動いています'); return; }
-  state.timer = beginTimer(candidate.subjectId); state.timer.type = candidate.type; state.timer.segments[0].type = candidate.type; state.timer.candidateId = candidate.id; await persist('タイマーを始めました'); renderAll();
+  state.timer = candidate.type === 'assignment' ? beginStopwatch(candidate.subjectId) : beginTimer(candidate.subjectId); state.timer.type = candidate.type; state.timer.segments[0].type = candidate.type; state.timer.candidateId = candidate.id; await persist('タイマーを始めました'); renderAll();
 }
 function openStartSubjectModal() {
   if (state.timer) return toast('すでにタイマーが動いています');
@@ -177,8 +177,9 @@ function openStartSubjectModal() {
   $('#modal [data-modal-cancel]').onclick = closeModal;
   $('#modal [data-start-manual]').onclick = async () => {
     const subjectId = $('#start-subject').value;
-    state.timer = beginTimer(subjectId);
-    state.timer.type = $('#start-type').value;
+    const type = $('#start-type').value;
+    state.timer = type === 'assignment' ? beginStopwatch(subjectId) : beginTimer(subjectId);
+    state.timer.type = type;
     state.timer.segments[0].type = state.timer.type;
     closeModal();
     await persist('タイマーを始めました');
