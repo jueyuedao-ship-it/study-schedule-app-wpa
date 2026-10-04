@@ -504,6 +504,15 @@ async function init() {
   if (state.timer && ['running', 'paused'].includes(state.timer.status) && timerElapsed(state.timer) > 6 * 3600000) openLongTimerPrompt();
   clearInterval(timerInterval); timerInterval = setInterval(() => { const followed = followJstDate(); if (!followed) refreshBreakPrompt(); if (state?.timer) { const elapsedNow = timerElapsed(state.timer); const stopwatch = state.timer.mode === 'stopwatch'; const isUnder = elapsedNow < (stopwatch ? 60000 : 1800000); const timerNumber = $('.timer-number'); if (timerNumber) timerNumber.textContent = stopwatch ? formatStopwatch(elapsedNow) : isUnder ? formatClock(timerRemaining(state.timer)) : `＋${formatClock(Math.max(0, elapsedNow - 1800000))}`; if (timerWasUnderMinimum !== null && timerWasUnderMinimum !== isUnder) { renderToday(); renderCalendar(); } const durations = dailyDurations(); const raw = durations[currentDate] || 0; const mins = Math.floor(raw / 60000); $('#progress-minutes').textContent = mins; $('#progress-meter').style.width = `${Math.min(100, Math.round(raw / 1800000 * 100))}%`; $('#progress-ring').style.setProperty('--progress', `${Math.min(100, Math.round(raw / 1800000 * 100))}%`); } maybeShowReminder(); }, 1000);
 }
+window.addEventListener('study-bridge-state-changed', async () => {
+  try {
+    state = await loadState();
+    renderAll();
+  } catch (error) {
+    toast(`外部操作後の再読み込みに失敗しました：${error.message}`, 'error');
+  }
+});
+
 init();
 
 export { effectiveState, renderToday, renderCalendar, renderTasks, renderSettings };
